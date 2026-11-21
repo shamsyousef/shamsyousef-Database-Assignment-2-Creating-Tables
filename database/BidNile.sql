@@ -145,8 +145,110 @@ CREATE TABLE Sales.AuctionFollow (
         CONSTRAINT DF_AuctionFollow_FollowedAt DEFAULT SYSDATETIME(),
     CONSTRAINT PK_AuctionFollow PRIMARY KEY (MemberId, AuctionId));
 GO
+ALTER TABLE Accounts.Member
+    ADD CONSTRAINT FK_Member_City FOREIGN KEY (CityId) REFERENCES Accounts.City (CityId),
+        CONSTRAINT FK_Member_ReferredBy FOREIGN KEY (ReferredByMemberId) REFERENCES Accounts.Member (MemberId),
+        CONSTRAINT FK_Member_Warehouse FOREIGN KEY (WarehouseId) REFERENCES Operations.Warehouse (WarehouseId);
+GO
+ALTER TABLE Accounts.Wallet
+    ADD CONSTRAINT FK_Wallet_Member FOREIGN KEY (MemberId) REFERENCES Accounts.Member (MemberId);
+GO
+ALTER TABLE Operations.Warehouse
+    ADD CONSTRAINT FK_Warehouse_City FOREIGN KEY (CityId) REFERENCES Accounts.City (CityId),
+        CONSTRAINT FK_Warehouse_Manager FOREIGN KEY (ManagerId) REFERENCES Accounts.Member (MemberId);
+GO
+ALTER TABLE Catalog.Category
+    ADD CONSTRAINT FK_Category_Parent FOREIGN KEY (ParentCategoryId) REFERENCES Catalog.Category (CategoryId);
+GO
+ALTER TABLE Catalog.Item
+    ADD CONSTRAINT FK_Item_Seller FOREIGN KEY (SellerId) REFERENCES Accounts.Member (MemberId),
+        CONSTRAINT FK_Item_Inspector FOREIGN KEY (InspectorId) REFERENCES Accounts.Member (MemberId),
+        CONSTRAINT FK_Item_Category FOREIGN KEY (CategoryId) REFERENCES Catalog.Category (CategoryId),
+        CONSTRAINT FK_Item_Warehouse FOREIGN KEY (WarehouseId) REFERENCES Operations.Warehouse (WarehouseId);
+GO
+ALTER TABLE Catalog.ItemPhoto
+    ADD CONSTRAINT FK_ItemPhoto_Item FOREIGN KEY (ItemId) REFERENCES Catalog.Item (ItemId) ON DELETE CASCADE;
+GO
 
+ALTER TABLE Sales.Auction
+    ADD CONSTRAINT FK_Auction_Item FOREIGN KEY (ItemId) REFERENCES Catalog.Item (ItemId);
+GO
 
+ALTER TABLE Sales.Bid
+    ADD CONSTRAINT FK_Bid_Auction FOREIGN KEY (AuctionId) REFERENCES Sales.Auction (AuctionId),
+        CONSTRAINT FK_Bid_Member FOREIGN KEY (MemberId) REFERENCES Accounts.Member (MemberId);
+GO
 
+ALTER TABLE Sales.AuctionFollow
+    ADD CONSTRAINT FK_AuctionFollow_Member FOREIGN KEY (MemberId) REFERENCES Accounts.Member (MemberId),
+        CONSTRAINT FK_AuctionFollow_Auction FOREIGN KEY (AuctionId) REFERENCES Sales.Auction (AuctionId);
+GO
+ALTER TABLE Accounts.Member
+    ADD AppLanguage CHAR(2) NOT NULL
+        CONSTRAINT DF_Member_AppLanguage DEFAULT 'ar'
+        CONSTRAINT CK_Member_AppLanguage CHECK (AppLanguage IN ('ar', 'en'));
+GO
+ALTER TABLE Catalog.Item
+    ADD IsFeatured BIT NOT NULL
+        CONSTRAINT DF_Item_IsFeatured DEFAULT 0;
+GO
+EXEC sp_rename 'Sales.Bid.IpAddress', 'DeviceIp', 'COLUMN';
+GO
+ALTER TABLE Operations.Warehouse
+    DROP CONSTRAINT CK_Warehouse_Capacity;
+GO
+EXEC sp_rename 'Operations.Warehouse.Capacity', 'MaxItems', 'COLUMN';
+GO
+ALTER TABLE Operations.Warehouse
+    ADD CONSTRAINT CK_Warehouse_MaxItems CHECK (MaxItems > 0);
+GO
 
-	     
+ALTER TABLE Accounts.Member
+    ALTER COLUMN FullName NVARCHAR(150) NOT NULL;
+GO
+ALTER TABLE Operations.Warehouse
+    DROP CONSTRAINT CK_Warehouse_MaxItems;
+GO
+ALTER TABLE Operations.Warehouse
+    ALTER COLUMN MaxItems SMALLINT NOT NULL;
+GO
+ALTER TABLE Operations.Warehouse
+    ADD CONSTRAINT CK_Warehouse_MaxItems CHECK (MaxItems > 0);
+GO
+ALTER TABLE Catalog.Category
+    DROP CONSTRAINT CK_Category_CommissionRate;
+GO
+
+ALTER TABLE Catalog.Category
+    ADD CONSTRAINT CK_Category_CommissionRate CHECK (CommissionRate BETWEEN 0 AND 25);
+GO
+ALTER TABLE Sales.Auction
+    DROP CONSTRAINT CK_Auction_Status, DF_Auction_Status;
+GO
+
+ALTER TABLE Sales.Auction
+    ADD CONSTRAINT CK_Auction_Status CHECK (Status IN ('PendingReview', 'Draft', 'Live', 'Ended', 'Cancelled')),
+        CONSTRAINT DF_Auction_Status DEFAULT 'PendingReview' FOR Status;
+GO
+ALTER TABLE Sales.Auction
+    ADD BuyNowPrice DECIMAL(12, 2) NULL;
+GO
+ALTER TABLE Sales.Auction WITH CHECK
+    ADD CONSTRAINT CK_Auction_BuyNowPrice CHECK (BuyNowPrice IS NULL OR BuyNowPrice > StartingPrice);
+GO
+ALTER TABLE Accounts.Member
+    ADD CONSTRAINT UQ_Member_Mobile UNIQUE (Mobile);
+GO
+ALTER TABLE Accounts.Member
+    ADD VerifiedAt DATETIME2(3) NULL;
+GO
+ALTER TABLE Accounts.Member
+    DROP CONSTRAINT DF_Member_IsVerified;
+GO
+ALTER TABLE Accounts.Member
+    DROP COLUMN IsVerified;
+GO
+CREATE SCHEMA Marketing;
+GO
+ALTER SCHEMA Marketing TRANSFER Sales.AuctionFollow;
+GO
